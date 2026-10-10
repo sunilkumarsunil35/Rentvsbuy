@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import { compare } from './calc.js'
+import { simulate } from './calc.js'
+import { money } from './format.js'
+import NetWorthChart from './NetWorthChart.jsx'
 
 const FIELDS = [
   { key: 'homePrice', label: 'Home price', unit: '₹', step: 100000 },
@@ -7,13 +9,13 @@ const FIELDS = [
   { key: 'ratePct', label: 'Home loan rate', unit: '%', step: 0.05 },
   { key: 'termYears', label: 'Loan term', unit: 'yrs', step: 5 },
   { key: 'rent', label: 'Monthly rent', unit: '₹', step: 1000 },
+  { key: 'investPct', label: 'Investment return / yr', unit: '%', step: 0.5 },
   { key: 'years', label: 'Years you plan to stay', unit: 'yrs', step: 1 },
 ]
 
 const ADVANCED = [
   { key: 'appreciationPct', label: 'Home price growth / yr', unit: '%', step: 0.5 },
   { key: 'rentIncreasePct', label: 'Rent increase / yr', unit: '%', step: 0.5 },
-  { key: 'investPct', label: 'Investment return / yr', unit: '%', step: 0.5 },
   { key: 'taxPct', label: 'Property tax / yr', unit: '%', step: 0.1 },
   { key: 'maintPct', label: 'Maintenance & society / yr', unit: '%', step: 0.1 },
   { key: 'insurance', label: 'Home insurance / yr', unit: '₹', step: 1000 },
@@ -38,9 +40,6 @@ const DEFAULTS = {
   sellPct: 2,
 }
 
-const money = (n) =>
-  n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
-
 function Field({ f, value, onChange }) {
   return (
     <label className="field">
@@ -63,6 +62,7 @@ function Field({ f, value, onChange }) {
 export default function App() {
   const [inputs, setInputs] = useState(DEFAULTS)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showTable, setShowTable] = useState(false)
 
   const onChange = (key, raw) => setInputs((s) => ({ ...s, [key]: raw }))
 
@@ -76,12 +76,13 @@ export default function App() {
     return p
   }, [inputs])
 
-  const { payment, upfront, rows } = useMemo(() => compare(params), [params])
+  const { emi, upfront, rows } = useMemo(() => simulate(params), [params])
+  const first = rows[0]
   const last = rows[rows.length - 1]
   const buyWins = last.buyNet >= last.rentNet
   const diff = Math.abs(last.buyNet - last.rentNet)
   const breakEven = rows.find((r) => r.buyNet >= r.rentNet)
-  const max = Math.max(...rows.map((r) => Math.max(r.buyNet, r.rentNet, 0)), 1)
+  const firstGap = first.monthlyBuy - first.monthlyRent
 
   return (
     <main>
@@ -116,38 +117,89 @@ export default function App() {
         </p>
         <p className="muted">
           {breakEven
-            ? `Buying breaks even in year ${breakEven.year}.`
-            : `Buying doesn't break even within ${params.years} years.`}
+            ? `Buying overtakes renting in year ${breakEven.year}.`
+            : `Buying doesn't catch up with renting within ${params.years} years.`}
         </p>
         <div className="stats">
-          <div><span>Monthly EMI</span><b>{money(payment)}</b></div>
-          <div><span>Cash needed to buy</span><b>{money(upfront)}</b></div>
           <div><span>Net worth if buying</span><b>{money(last.buyNet)}</b></div>
           <div><span>Net worth if renting</span><b>{money(last.rentNet)}</b></div>
+          <div><span>Monthly EMI</span><b>{money(emi)}</b></div>
+          <div><span>Cash needed to buy</span><b>{money(upfront)}</b></div>
         </div>
+      </section>
+
+      <section className="card">
+        <h3>Monthly cash flow (year 1)</h3>
+        <div className="flow">
+          <div>
+            <span>Buying costs / month</span>
+            <b>{money(first.monthlyBuy)}</b>
+            <small>EMI + property tax + maintenance + insurance</small>
+          </div>
+          <div>
+            <span>Rent / month</span>
+            <b>{money(first.monthlyRent)}</b>
+            <small>grows {params.rentIncreasePct}% every year</small>
+          </div>
+          <div className="highlight">
+            <span>{firstGap >= 0 ? 'Renter invests' : 'Buyer invests'} / month</span>
+            <b>{money(Math.abs(firstGap))}</b>
+            <small>at {params.investPct}% a year, compounded monthly</small>
+          </div>
+        </div>
+        <p className="muted small">
+          The renter also invests the {money(upfront)} a buyer would spend on the down payment and
+          stamp duty. This comparison is redone every month, so as rent rises (or the loan is paid
+          off) the side that invests can switch.
+        </p>
       </section>
 
       <section className="card">
         <h3>Net worth by year</h3>
         <div className="legend">
-          <span className="dot buy" /> Buy <span className="dot rent" /> Rent
+          <span><i className="key buy" /> Buy (home equity after selling costs + investments)</span>
+          <span><i className="key rent" /> Rent (investments)</span>
         </div>
-        <div className="bars">
-          {rows.map((r) => (
-            <div className="bar-row" key={r.year}>
-              <span className="yr">Y{r.year}</span>
-              <div className="pair">
-                <div className="bar buy" style={{ width: `${(Math.max(r.buyNet, 0) / max) * 100}%` }} title={money(r.buyNet)} />
-                <div className="bar rent" style={{ width: `${(Math.max(r.rentNet, 0) / max) * 100}%` }} title={money(r.rentNet)} />
-              </div>
-            </div>
-          ))}
-        </div>
+        <NetWorthChart rows={rows} />
+        <button className="link" onClick={() => setShowTable((v) => !v)}>
+          {showTable ? 'Hide' : 'Show'} year-by-year table
+        </button>
+        {showTable && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Buy cost / mo</th>
+                  <th>Rent / mo</th>
+                  <th>Renter invested (yr)</th>
+                  <th>Buyer invested (yr)</th>
+                  <th>Home equity</th>
+                  <th>Buy net worth</th>
+                  <th>Rent net worth</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.year}>
+                    <td>{r.year}</td>
+                    <td>{money(r.monthlyBuy)}</td>
+                    <td>{money(r.monthlyRent)}</td>
+                    <td>{money(r.renterInvested)}</td>
+                    <td>{money(r.buyerInvested)}</td>
+                    <td>{money(r.equity)}</td>
+                    <td className={r.buyNet >= r.rentNet ? 'win' : ''}>{money(r.buyNet)}</td>
+                    <td className={r.rentNet > r.buyNet ? 'win' : ''}>{money(r.rentNet)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <footer className="muted">
-        Assumes both options start with the same cash, and whichever is cheaper each year invests
-        the savings. Estimates only — not financial advice.
+        Estimates only — not financial advice. Ignores taxes on gains and home loan tax benefits.
       </footer>
     </main>
   )
