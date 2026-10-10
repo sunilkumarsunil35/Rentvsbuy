@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import { compare } from './calc.js'
 
 const FIELDS = [
-  { key: 'homePrice', label: 'Home price', unit: '$', step: 5000 },
+  { key: 'homePrice', label: 'Home price', unit: '₹', step: 100000 },
   { key: 'downPct', label: 'Down payment', unit: '%', step: 1 },
-  { key: 'ratePct', label: 'Mortgage rate', unit: '%', step: 0.125 },
+  { key: 'ratePct', label: 'Home loan rate', unit: '%', step: 0.05 },
   { key: 'termYears', label: 'Loan term', unit: 'yrs', step: 5 },
-  { key: 'rent', label: 'Monthly rent', unit: '$', step: 50 },
+  { key: 'rent', label: 'Monthly rent', unit: '₹', step: 1000 },
   { key: 'years', label: 'Years you plan to stay', unit: 'yrs', step: 1 },
 ]
 
@@ -15,38 +15,38 @@ const ADVANCED = [
   { key: 'rentIncreasePct', label: 'Rent increase / yr', unit: '%', step: 0.5 },
   { key: 'investPct', label: 'Investment return / yr', unit: '%', step: 0.5 },
   { key: 'taxPct', label: 'Property tax / yr', unit: '%', step: 0.1 },
-  { key: 'maintPct', label: 'Maintenance / yr', unit: '%', step: 0.1 },
-  { key: 'insurance', label: 'Home insurance / yr', unit: '$', step: 100 },
-  { key: 'closingPct', label: 'Closing costs (buy)', unit: '%', step: 0.5 },
-  { key: 'sellPct', label: 'Selling costs', unit: '%', step: 0.5 },
+  { key: 'maintPct', label: 'Maintenance & society / yr', unit: '%', step: 0.1 },
+  { key: 'insurance', label: 'Home insurance / yr', unit: '₹', step: 1000 },
+  { key: 'closingPct', label: 'Stamp duty & registration', unit: '%', step: 0.5 },
+  { key: 'sellPct', label: 'Selling costs (brokerage)', unit: '%', step: 0.5 },
 ]
 
 const DEFAULTS = {
-  homePrice: 400000,
+  homePrice: 8000000,
   downPct: 20,
-  ratePct: 6.5,
-  termYears: 30,
-  rent: 2000,
+  ratePct: 8.5,
+  termYears: 20,
+  rent: 25000,
   years: 10,
-  appreciationPct: 3,
-  rentIncreasePct: 3,
-  investPct: 6,
-  taxPct: 1.1,
-  maintPct: 1,
-  insurance: 1500,
-  closingPct: 3,
-  sellPct: 6,
+  appreciationPct: 5,
+  rentIncreasePct: 5,
+  investPct: 10,
+  taxPct: 0.1,
+  maintPct: 0.5,
+  insurance: 5000,
+  closingPct: 7,
+  sellPct: 2,
 }
 
 const money = (n) =>
-  n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+  n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
 
 function Field({ f, value, onChange }) {
   return (
     <label className="field">
       <span>{f.label}</span>
       <div className="input">
-        {f.unit === '$' && <em>$</em>}
+        {f.unit === '₹' && <em>₹</em>}
         <input
           type="number"
           min="0"
@@ -54,7 +54,7 @@ function Field({ f, value, onChange }) {
           value={value}
           onChange={(e) => onChange(f.key, e.target.value)}
         />
-        {f.unit !== '$' && <em>{f.unit}</em>}
+        {f.unit !== '₹' && <em>{f.unit}</em>}
       </div>
     </label>
   )
@@ -120,7 +120,7 @@ export default function App() {
             : `Buying doesn't break even within ${params.years} years.`}
         </p>
         <div className="stats">
-          <div><span>Monthly mortgage</span><b>{money(payment)}</b></div>
+          <div><span>Monthly EMI</span><b>{money(payment)}</b></div>
           <div><span>Cash needed to buy</span><b>{money(upfront)}</b></div>
           <div><span>Net worth if buying</span><b>{money(last.buyNet)}</b></div>
           <div><span>Net worth if renting</span><b>{money(last.rentNet)}</b></div>
